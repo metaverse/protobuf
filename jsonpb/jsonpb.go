@@ -566,11 +566,11 @@ func (m *Marshaler) marshalValue(out *errWriter, prop *proto.Properties, v refle
 	}
 
 	if t, ok := v.Interface().(time.Time); ok {
-		ts, err := types.TimestampProto(t)
-		if err != nil {
-			return err
-		}
-		return m.marshalValue(out, prop, reflect.ValueOf(ts), indent)
+		tt := t.Format(time.RFC3339Nano)
+		out.write(`"`)
+		out.write(tt)
+		out.write(`"`)
+		return out.err
 	}
 
 	if d, ok := v.Interface().(time.Duration); ok {
@@ -968,14 +968,16 @@ func (u *Unmarshaler) unmarshalValue(target reflect.Value, inputValue json.RawMe
 	}
 
 	if t, ok := target.Addr().Interface().(*time.Time); ok {
-		ts := &types.Timestamp{}
-		if err := u.unmarshalValue(reflect.ValueOf(ts).Elem(), inputValue, prop); err != nil {
-			return err
-		}
-		tt, err := types.TimestampFromProto(ts)
+		unq, err := unquote(string(inputValue))
 		if err != nil {
 			return err
 		}
+
+		tt, err := time.Parse(time.RFC3339Nano, unq)
+		if err != nil {
+			return fmt.Errorf("bad Timestamp: %v", err)
+		}
+
 		*t = tt
 		return nil
 	}
